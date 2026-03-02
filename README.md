@@ -23,7 +23,7 @@ Optionally, add a shell alias to launch with one command from anywhere:
 
 ```bash
 # Add to ~/.zshrc or ~/.bashrc
-alias todo='cd ~/projects/todo-app && python3 server.py & open http://localhost:8080'
+alias todo='cd <path-to-todo-app> && python3 server.py & open http://localhost:8080'
 ```
 
 Then just run `todo`.
@@ -50,8 +50,8 @@ An MCP server (`mcp_server.py`) exposes the todo app as native Claude Code tools
    {
      "mcpServers": {
        "todo": {
-         "command": "/path/to/todo-app/.venv/bin/python3",
-         "args": ["/path/to/todo-app/mcp_server.py"]
+         "command": "<path-to-todo-app>/.venv/bin/python3",
+         "args": ["<path-to-todo-app>/mcp_server.py"]
        }
      }
    }

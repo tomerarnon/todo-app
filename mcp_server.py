@@ -5,7 +5,7 @@ import json
 import urllib.request
 from mcp.server.fastmcp import FastMCP
 
-API = "http://localhost:8080/api/tasks"
+API = "http://localhost:7847/api/tasks"
 
 mcp = FastMCP("todo")
 

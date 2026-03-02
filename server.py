@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
-PORT = 8080
+PORT = 7847
 TASKS_FILE = Path(__file__).parent / "tasks.json"
 
 
