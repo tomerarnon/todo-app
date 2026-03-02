@@ -6,7 +6,8 @@ A lightweight, local todo list with a clean web UI. Designed to stay open in a s
 
 - Add, check off, edit, and delete tasks
 - Organize tasks into collapsible categories
-- No dependencies — Python stdlib only
+- No dependencies for the server — Python stdlib only
+- MCP server for Claude Code integration
 - Data stored in a plain `tasks.json` file
 - UI auto-refreshes every 3 seconds to pick up external edits
 
@@ -29,18 +30,33 @@ Then just run `todo`.
 
 ## Claude Code Integration
 
-Claude can read and write tasks directly by editing `tasks.json`:
+An MCP server (`mcp_server.py`) exposes the todo app as native Claude Code tools:
 
-```json
-[
-  {
-    "id": "abc123",
-    "text": "Buy groceries",
-    "done": false,
-    "category": "Personal",
-    "created": "2026-03-01T10:00:00+00:00"
-  }
-]
-```
+- **list_tasks** — list all tasks, optionally filtered by category
+- **add_task** — add a new task with optional category
+- **complete_task** — mark a task as done
+- **delete_task** — delete a task
 
-Changes appear in the UI within a few seconds.
+### Setup
+
+1. Create a venv and install the `mcp` package:
+   ```bash
+   python3 -m venv .venv
+   .venv/bin/pip install mcp
+   ```
+
+2. Add to `~/.claude/settings.json`:
+   ```json
+   {
+     "mcpServers": {
+       "todo": {
+         "command": "/path/to/todo-app/.venv/bin/python3",
+         "args": ["/path/to/todo-app/mcp_server.py"]
+       }
+     }
+   }
+   ```
+
+3. Restart Claude Code. The tools will be available automatically.
+
+The MCP server calls the REST API under the hood, so the todo app server must be running.
