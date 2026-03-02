@@ -17,13 +17,13 @@ A lightweight, local todo list with a clean web UI. Designed to stay open in a s
 python3 server.py
 ```
 
-Open [http://localhost:8080](http://localhost:8080) in your browser.
+Open [http://localhost:7847](http://localhost:7847) in your browser.
 
 Optionally, add a shell alias to launch with one command from anywhere:
 
 ```bash
 # Add to ~/.zshrc or ~/.bashrc
-alias todo='cd <path-to-todo-app> && python3 server.py & open http://localhost:8080'
+alias todo='cd <path-to-todo-app> && python3 server.py & open http://localhost:7847'
 ```
 
 Then just run `todo`.
