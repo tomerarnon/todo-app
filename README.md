@@ -18,6 +18,15 @@ python3 server.py
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
 
+Optionally, add a shell alias to launch with one command from anywhere:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+alias todo='cd ~/projects/todo-app && python3 server.py & open http://localhost:8080'
+```
+
+Then just run `todo`.
+
 ## Claude Code Integration
 
 Claude can read and write tasks directly by editing `tasks.json`:
