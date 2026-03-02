@@ -12,6 +12,10 @@ PORT = 8080
 TASKS_FILE = Path(__file__).parent / "tasks.json"
 
 
+def normalize_category(name):
+    return " ".join(w.capitalize() for w in name.strip().split())
+
+
 def read_tasks():
     if not TASKS_FILE.exists():
         return []
@@ -43,7 +47,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "id": uuid.uuid4().hex[:8],
                 "text": body.get("text", ""),
                 "done": False,
-                "category": body.get("category", "General"),
+                "category": normalize_category(body.get("category", "General")),
                 "created": datetime.now(timezone.utc).isoformat(),
             }
             tasks.append(task)
@@ -64,7 +68,7 @@ class Handler(SimpleHTTPRequestHandler):
                     if "done" in body:
                         t["done"] = body["done"]
                     if "category" in body:
-                        t["category"] = body["category"]
+                        t["category"] = normalize_category(body["category"])
                     write_tasks(tasks)
                     self._json_response(t)
                     return

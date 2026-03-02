@@ -318,7 +318,15 @@ function saveCategories() {
   localStorage.setItem("categories", JSON.stringify(categoryList));
 }
 
+function normalizeCategory(name) {
+  return name.trim().replace(/\s+/g, " ")
+    .split(" ")
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function ensureCategory(name) {
+  name = normalizeCategory(name);
   if (!categoryList.includes(name)) {
     categoryList.push(name);
     saveCategories();
@@ -335,7 +343,10 @@ async function fetchTasks() {
       tasks = data;
       lastJson = json;
       // Ensure all task categories are in the list
-      tasks.forEach(t => ensureCategory(t.category || "General"));
+      tasks.forEach(t => {
+        t.category = normalizeCategory(t.category || "General");
+        ensureCategory(t.category);
+      });
       render();
     }
   } catch (e) {}
@@ -492,7 +503,7 @@ async function deleteTask(id, li) {
 }
 
 function addCategory() {
-  const name = newCategoryInput.value.trim();
+  const name = normalizeCategory(newCategoryInput.value);
   if (!name || categoryList.includes(name)) return;
   newCategoryInput.value = "";
   categoryList.push(name);
