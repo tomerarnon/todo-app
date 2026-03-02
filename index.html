@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Todo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a73e8;
+    margin-bottom: 20px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 380px;
+  }
+
+  /* Add task input */
+  .add-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .add-bar input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .add-bar input:focus {
+    border-color: #1a73e8;
+  }
+
+  .add-bar button {
+    padding: 10px 16px;
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  .add-bar button:hover { background: #1557b0; }
+
+  /* Task list */
+  .task-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: opacity 0.3s, transform 0.3s;
+  }
+
+  .task-item.removing {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+
+  /* Custom checkbox */
+  .task-check {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #bbb;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .task-check:hover { border-color: #1a73e8; }
+
+  .task-check.checked {
+    background: #1a73e8;
+    border-color: #1a73e8;
+  }
+
+  .task-check.checked::after {
+    content: "";
+    width: 6px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+
+  /* Task text */
+  .task-text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    word-break: break-word;
+    cursor: text;
+    padding: 2px 0;
+    transition: color 0.3s;
+  }
+
+  .task-text.done {
+    text-decoration: line-through;
+    color: #999;
+  }
+
+  .task-text:focus {
+    outline: none;
+    background: #f0f4ff;
+    border-radius: 4px;
+  }
+
+  /* Delete button */
+  .task-delete {
+    opacity: 0;
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #bbb;
+    cursor: pointer;
+    padding: 4px;
+    transition: opacity 0.15s, color 0.15s;
+  }
+
+  .task-item:hover .task-delete { opacity: 1; }
+  .task-delete:hover { color: #e53935; }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    color: #aaa;
+    font-size: 14px;
+    margin-top: 48px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Todo</h1>
+
+  <div class="add-bar">
+    <input id="newTask" type="text" placeholder="Add a task..." autofocus>
+    <button id="addBtn">Add</button>
+  </div>
+
+  <ul class="task-list" id="taskList"></ul>
+  <div class="empty" id="empty" style="display:none">No tasks yet</div>
+</div>
+
+<script>
+const API = "/api/tasks";
+const listEl = document.getElementById("taskList");
+const emptyEl = document.getElementById("empty");
+const input = document.getElementById("newTask");
+const addBtn = document.getElementById("addBtn");
+
+let tasks = [];
+let lastJson = "";
+
+// --- Fetch & render ---
+async function fetchTasks() {
+  try {
+    const res = await fetch(API);
+    const data = await res.json();
+    const json = JSON.stringify(data);
+    if (json !== lastJson) {
+      tasks = data;
+      lastJson = json;
+      render();
+    }
+  } catch (e) {}
+}
+
+function render() {
+  listEl.innerHTML = "";
+  // Show incomplete first, then completed
+  const sorted = [...tasks].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+  sorted.forEach(task => {
+    const li = document.createElement("li");
+    li.className = "task-item";
+    li.dataset.id = task.id;
+
+    const check = document.createElement("div");
+    check.className = "task-check" + (task.done ? " checked" : "");
+    check.onclick = () => toggleDone(task);
+
+    const text = document.createElement("span");
+    text.className = "task-text" + (task.done ? " done" : "");
+    text.textContent = task.text;
+    text.contentEditable = true;
+    text.spellcheck = false;
+    text.onblur = () => updateText(task, text.textContent.trim());
+    text.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); text.blur(); }
+    };
+
+    const del = document.createElement("button");
+    del.className = "task-delete";
+    del.innerHTML = "&#x2715;";
+    del.onclick = () => deleteTask(task.id, li);
+
+    li.append(check, text, del);
+    listEl.appendChild(li);
+  });
+  emptyEl.style.display = tasks.length === 0 ? "block" : "none";
+}
+
+// --- Actions ---
+async function addTask() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  await fetchTasks();
+}
+
+async function toggleDone(task) {
+  await fetch(`${API}/${task.id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ done: !task.done }),
+  });
+  await fetchTasks();
+}
+
+async function updateText(task, newText) {
+  if (newText === task.text || !newText) return;
+  await fetch(`${API}/${task.id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: newText }),
+  });
+  await fetchTasks();
+}
+
+async function deleteTask(id, li) {
+  li.classList.add("removing");
+  setTimeout(async () => {
+    await fetch(`${API}/${id}`, { method: "DELETE" });
+    await fetchTasks();
+  }, 250);
+}
+
+// --- Events ---
+addBtn.onclick = addTask;
+input.onkeydown = (e) => { if (e.key === "Enter") addTask(); };
+
+// --- Poll for external changes (e.g. Claude editing tasks.json) ---
+fetchTasks();
+setInterval(fetchTasks, 3000);
+</script>
+
+</body>
+</html>
