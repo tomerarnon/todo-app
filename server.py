@@ -43,6 +43,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "id": uuid.uuid4().hex[:8],
                 "text": body.get("text", ""),
                 "done": False,
+                "category": body.get("category", "General"),
                 "created": datetime.now(timezone.utc).isoformat(),
             }
             tasks.append(task)
@@ -62,6 +63,8 @@ class Handler(SimpleHTTPRequestHandler):
                         t["text"] = body["text"]
                     if "done" in body:
                         t["done"] = body["done"]
+                    if "category" in body:
+                        t["category"] = body["category"]
                     write_tasks(tasks)
                     self._json_response(t)
                     return

@@ -35,10 +35,12 @@
     display: flex;
     gap: 8px;
     margin-bottom: 16px;
+    flex-wrap: wrap;
   }
 
-  .add-bar input {
+  .add-bar input[type="text"] {
     flex: 1;
+    min-width: 0;
     padding: 10px 14px;
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -47,7 +49,23 @@
     transition: border-color 0.2s;
   }
 
-  .add-bar input:focus {
+  .add-bar input[type="text"]:focus {
+    border-color: #1a73e8;
+  }
+
+  .add-bar select {
+    padding: 10px 8px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    background: #fff;
+    color: #555;
+    cursor: pointer;
+    max-width: 120px;
+  }
+
+  .add-bar select:focus {
     border-color: #1a73e8;
   }
 
@@ -65,14 +83,75 @@
 
   .add-bar button:hover { background: #1557b0; }
 
-  /* Task list */
-  .task-list {
+  /* Category sections */
+  .category-section {
+    margin-bottom: 12px;
+  }
+
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 4px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .category-header:hover { color: #333; }
+
+  .category-arrow {
+    font-size: 10px;
+    transition: transform 0.2s;
+    display: inline-block;
+    width: 14px;
+  }
+
+  .category-arrow.collapsed {
+    transform: rotate(-90deg);
+  }
+
+  .category-count {
+    font-weight: 400;
+    color: #aaa;
+    font-size: 12px;
+    margin-left: 4px;
+  }
+
+  .category-delete {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+  }
+
+  .category-header:hover .category-delete { opacity: 1; }
+  .category-delete:hover { color: #e53935; }
+
+  .category-tasks {
     list-style: none;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
   }
 
+  .category-tasks.collapsed {
+    max-height: 0 !important;
+  }
+
+  /* Task items */
   .task-item {
     display: flex;
     align-items: center;
@@ -156,6 +235,36 @@
   .task-item:hover .task-delete { opacity: 1; }
   .task-delete:hover { color: #e53935; }
 
+  /* New category input */
+  .new-category-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .new-category-row input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .new-category-row input:focus { border-color: #1a73e8; }
+
+  .new-category-row button {
+    padding: 6px 12px;
+    background: none;
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #888;
+    cursor: pointer;
+  }
+
+  .new-category-row button:hover { border-color: #1a73e8; color: #1a73e8; }
+
   /* Empty state */
   .empty {
     text-align: center;
@@ -172,22 +281,49 @@
 
   <div class="add-bar">
     <input id="newTask" type="text" placeholder="Add a task..." autofocus>
+    <select id="categorySelect"></select>
     <button id="addBtn">Add</button>
   </div>
 
-  <ul class="task-list" id="taskList"></ul>
+  <div class="new-category-row">
+    <input id="newCategory" type="text" placeholder="New category...">
+    <button id="addCategoryBtn">+ Category</button>
+  </div>
+
+  <div id="sections"></div>
   <div class="empty" id="empty" style="display:none">No tasks yet</div>
 </div>
 
 <script>
 const API = "/api/tasks";
-const listEl = document.getElementById("taskList");
+const sectionsEl = document.getElementById("sections");
 const emptyEl = document.getElementById("empty");
 const input = document.getElementById("newTask");
 const addBtn = document.getElementById("addBtn");
+const categorySelect = document.getElementById("categorySelect");
+const newCategoryInput = document.getElementById("newCategory");
+const addCategoryBtn = document.getElementById("addCategoryBtn");
 
 let tasks = [];
 let lastJson = "";
+let collapsedCategories = JSON.parse(localStorage.getItem("collapsed") || "{}");
+// Persisted category list (so empty categories survive)
+let categoryList = JSON.parse(localStorage.getItem("categories") || '["General"]');
+
+function saveCollapsed() {
+  localStorage.setItem("collapsed", JSON.stringify(collapsedCategories));
+}
+
+function saveCategories() {
+  localStorage.setItem("categories", JSON.stringify(categoryList));
+}
+
+function ensureCategory(name) {
+  if (!categoryList.includes(name)) {
+    categoryList.push(name);
+    saveCategories();
+  }
+}
 
 // --- Fetch & render ---
 async function fetchTasks() {
@@ -198,43 +334,121 @@ async function fetchTasks() {
     if (json !== lastJson) {
       tasks = data;
       lastJson = json;
+      // Ensure all task categories are in the list
+      tasks.forEach(t => ensureCategory(t.category || "General"));
       render();
     }
   } catch (e) {}
 }
 
 function render() {
-  listEl.innerHTML = "";
-  // Show incomplete first, then completed
-  const sorted = [...tasks].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
-  sorted.forEach(task => {
-    const li = document.createElement("li");
-    li.className = "task-item";
-    li.dataset.id = task.id;
+  sectionsEl.innerHTML = "";
+  updateCategoryDropdown();
 
-    const check = document.createElement("div");
-    check.className = "task-check" + (task.done ? " checked" : "");
-    check.onclick = () => toggleDone(task);
+  // Group tasks by category
+  const groups = {};
+  categoryList.forEach(c => { groups[c] = []; });
+  tasks.forEach(t => {
+    const cat = t.category || "General";
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(t);
+  });
 
-    const text = document.createElement("span");
-    text.className = "task-text" + (task.done ? " done" : "");
-    text.textContent = task.text;
-    text.contentEditable = true;
-    text.spellcheck = false;
-    text.onblur = () => updateText(task, text.textContent.trim());
-    text.onkeydown = (e) => {
-      if (e.key === "Enter") { e.preventDefault(); text.blur(); }
+  const allCategories = categoryList.filter(c => groups[c]);
+
+  allCategories.forEach(cat => {
+    const catTasks = groups[cat];
+    // Sort: incomplete first, then completed
+    catTasks.sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+    const incomplete = catTasks.filter(t => !t.done).length;
+
+    const section = document.createElement("div");
+    section.className = "category-section";
+
+    const isCollapsed = collapsedCategories[cat] === true;
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "category-header";
+
+    const arrow = document.createElement("span");
+    arrow.className = "category-arrow" + (isCollapsed ? " collapsed" : "");
+    arrow.textContent = "\u25BC";
+
+    const label = document.createElement("span");
+    label.textContent = cat;
+
+    const count = document.createElement("span");
+    count.className = "category-count";
+    count.textContent = incomplete > 0 ? `${incomplete}` : "";
+
+    const delCat = document.createElement("button");
+    delCat.className = "category-delete";
+    delCat.innerHTML = "&#x2715;";
+    delCat.title = "Delete category (moves tasks to General)";
+    delCat.onclick = (e) => { e.stopPropagation(); deleteCategory(cat); };
+    if (cat === "General") delCat.style.display = "none";
+
+    header.append(arrow, label, count, delCat);
+    header.onclick = () => {
+      collapsedCategories[cat] = !collapsedCategories[cat];
+      saveCollapsed();
+      render();
     };
 
-    const del = document.createElement("button");
-    del.className = "task-delete";
-    del.innerHTML = "&#x2715;";
-    del.onclick = () => deleteTask(task.id, li);
+    // Task list
+    const ul = document.createElement("ul");
+    ul.className = "category-tasks" + (isCollapsed ? " collapsed" : "");
 
-    li.append(check, text, del);
-    listEl.appendChild(li);
+    catTasks.forEach(task => {
+      const li = document.createElement("li");
+      li.className = "task-item";
+      li.dataset.id = task.id;
+
+      const check = document.createElement("div");
+      check.className = "task-check" + (task.done ? " checked" : "");
+      check.onclick = () => toggleDone(task);
+
+      const text = document.createElement("span");
+      text.className = "task-text" + (task.done ? " done" : "");
+      text.textContent = task.text;
+      text.contentEditable = true;
+      text.spellcheck = false;
+      text.onblur = () => updateText(task, text.textContent.trim());
+      text.onkeydown = (e) => {
+        if (e.key === "Enter") { e.preventDefault(); text.blur(); }
+      };
+
+      const del = document.createElement("button");
+      del.className = "task-delete";
+      del.innerHTML = "&#x2715;";
+      del.onclick = () => deleteTask(task.id, li);
+
+      li.append(check, text, del);
+      ul.appendChild(li);
+    });
+
+    if (!isCollapsed) {
+      ul.style.maxHeight = (catTasks.length * 60 + 20) + "px";
+    }
+
+    section.append(header, ul);
+    sectionsEl.appendChild(section);
   });
+
   emptyEl.style.display = tasks.length === 0 ? "block" : "none";
+}
+
+function updateCategoryDropdown() {
+  const prev = categorySelect.value;
+  categorySelect.innerHTML = "";
+  categoryList.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    categorySelect.appendChild(opt);
+  });
+  if (categoryList.includes(prev)) categorySelect.value = prev;
 }
 
 // --- Actions ---
@@ -245,7 +459,7 @@ async function addTask() {
   await fetch(API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, category: categorySelect.value }),
   });
   await fetchTasks();
 }
@@ -277,9 +491,37 @@ async function deleteTask(id, li) {
   }, 250);
 }
 
+function addCategory() {
+  const name = newCategoryInput.value.trim();
+  if (!name || categoryList.includes(name)) return;
+  newCategoryInput.value = "";
+  categoryList.push(name);
+  saveCategories();
+  render();
+}
+
+async function deleteCategory(cat) {
+  // Move all tasks in this category to General
+  const toMove = tasks.filter(t => (t.category || "General") === cat);
+  for (const t of toMove) {
+    await fetch(`${API}/${t.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: "General" }),
+    });
+  }
+  categoryList = categoryList.filter(c => c !== cat);
+  delete collapsedCategories[cat];
+  saveCategories();
+  saveCollapsed();
+  await fetchTasks();
+}
+
 // --- Events ---
 addBtn.onclick = addTask;
 input.onkeydown = (e) => { if (e.key === "Enter") addTask(); };
+addCategoryBtn.onclick = addCategory;
+newCategoryInput.onkeydown = (e) => { if (e.key === "Enter") addCategory(); };
 
 // --- Poll for external changes (e.g. Claude editing tasks.json) ---
 fetchTasks();
